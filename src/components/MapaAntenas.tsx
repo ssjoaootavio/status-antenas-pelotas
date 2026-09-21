@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Antena } from '../types';
-import { CORES_STATUS, LABEL_STATUS, formatarHora } from '../utils';
+import { corDaOperadora, geracoesDe, formatarData } from '../utils';
 
 const PELOTAS: [number, number] = [-31.7719, -52.3425];
 
@@ -20,21 +20,15 @@ export function MapaAntenas({ antenas, selecionada, onSelecionar }: Props) {
   const onSelecionarRef = useRef(onSelecionar);
   onSelecionarRef.current = onSelecionar;
 
-  // Inicializa o mapa uma vez.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, {
-      center: PELOTAS,
-      zoom: 12,
-      zoomControl: true,
-    });
+    const map = L.map(containerRef.current, { center: PELOTAS, zoom: 12 });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
     }).addTo(map);
     camadaRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
-
     return () => {
       map.remove();
       mapRef.current = null;
@@ -43,7 +37,6 @@ export function MapaAntenas({ antenas, selecionada, onSelecionar }: Props) {
     };
   }, []);
 
-  // Redesenha os marcadores quando as antenas mudam.
   useEffect(() => {
     const camada = camadaRef.current;
     if (!camada) return;
@@ -51,18 +44,20 @@ export function MapaAntenas({ antenas, selecionada, onSelecionar }: Props) {
     marcadoresRef.current.clear();
 
     for (const a of antenas) {
-      const marcador = L.circleMarker([a.lat, a.lng], {
-        radius: a.status === 'offline' ? 9 : 7,
+      const marcador = L.circleMarker([a.lat, a.lon], {
+        radius: 6,
         color: '#ffffff',
-        weight: 1.5,
-        fillColor: CORES_STATUS[a.status],
+        weight: 1.2,
+        fillColor: corDaOperadora(a.operadora),
         fillOpacity: 0.9,
       });
+      const geracoes = geracoesDe(a.tecnologias).join(', ') || '—';
       marcador.bindPopup(
-        `<strong>${a.bairro}</strong> — ${a.operadora}<br/>` +
-          `${a.id} · ${a.tecnologia}<br/>` +
-          `<span style="color:${CORES_STATUS[a.status]};font-weight:600">${LABEL_STATUS[a.status]}</span><br/>` +
-          `<small>Atualizado ${formatarHora(a.atualizadoEm)}</small>`,
+        `<strong>${a.operadora}</strong><br/>` +
+          `${a.logradouro || 'Endereço não informado'}<br/>` +
+          `Tecnologias: ${geracoes}<br/>` +
+          `Bandas: ${a.bandas.join(', ') || '—'}<br/>` +
+          `<small>ID ${a.id} · licenc. ${formatarData(a.licenciamento)}</small>`,
       );
       marcador.on('click', () => onSelecionarRef.current(a.id));
       marcador.addTo(camada);
@@ -70,7 +65,6 @@ export function MapaAntenas({ antenas, selecionada, onSelecionar }: Props) {
     }
   }, [antenas]);
 
-  // Abre o popup da antena selecionada (via lista).
   useEffect(() => {
     if (!selecionada) return;
     const marcador = marcadoresRef.current.get(selecionada);

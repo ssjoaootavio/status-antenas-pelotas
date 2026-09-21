@@ -6,6 +6,7 @@
   "description": "Painel de status das antenas de celular em Pelotas durante contingência (temporal).",
   "scripts": {
     "dev": "vite",
+    "fetch": "node scripts/fetch-dados.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

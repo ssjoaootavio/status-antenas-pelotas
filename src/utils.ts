@@ -1,67 +1,60 @@
-import type { Antena, Resumo, StatusAntena } from './types';
-
-export const CORES_STATUS: Record<StatusAntena, string> = {
-  online: '#16a34a', // verde
-  instavel: '#f59e0b', // âmbar
-  offline: '#dc2626', // vermelho
+// Cores por operadora (aproximação das marcas, tons acessíveis).
+export const CORES_OPERADORA: Record<string, string> = {
+  Vivo: '#8b0d9e',
+  Claro: '#e4002b',
+  TIM: '#004691',
+  Oi: '#f7a600',
 };
 
-export const LABEL_STATUS: Record<StatusAntena, string> = {
-  online: 'No ar',
-  instavel: 'Instável',
-  offline: 'Fora do ar',
-};
+const COR_OUTRA = '#475569';
 
-export function corDoStatus(status: StatusAntena): string {
-  return CORES_STATUS[status];
+export function corDaOperadora(op: string): string {
+  return CORES_OPERADORA[op] ?? COR_OUTRA;
 }
 
-export function calcularResumo(antenas: Antena[]): Resumo {
-  const total = antenas.length;
-  let online = 0;
-  let instavel = 0;
-  let offline = 0;
-  const bairrosComProblema = new Set<string>();
+// Mapeamento tecnologia técnica -> geração.
+const TECH_GERACAO: Record<string, string> = {
+  GSM: '2G',
+  WCDMA: '3G',
+  UMTS: '3G',
+  LTE: '4G',
+  NR: '5G',
+};
 
-  for (const a of antenas) {
-    if (a.status === 'online') online++;
-    else if (a.status === 'instavel') {
-      instavel++;
-      bairrosComProblema.add(a.bairro);
-    } else {
-      offline++;
-      bairrosComProblema.add(a.bairro);
-    }
+const ORDEM_GERACAO = ['2G', '3G', '4G', '5G'];
+
+/** Converte a lista técnica (LTE, NR...) em gerações (4G, 5G...). */
+export function geracoesDe(tecnologias: string[]): string[] {
+  const set = new Set<string>();
+  for (const t of tecnologias) {
+    const g = TECH_GERACAO[t.toUpperCase()];
+    if (g) set.add(g);
   }
-
-  return {
-    total,
-    online,
-    instavel,
-    offline,
-    percentualNoAr: total === 0 ? 0 : Math.round((online / total) * 100),
-    bairrosAfetados: bairrosComProblema.size,
-  };
+  return ORDEM_GERACAO.filter((g) => set.has(g));
 }
 
-export function formatarHora(iso: string): string {
+/** A geração mais avançada de uma antena, para rótulo/ordenação. */
+export function melhorGeracao(tecnologias: string[]): string {
+  const g = geracoesDe(tecnologias);
+  return g[g.length - 1] ?? '—';
+}
+
+export function formatarData(iso: string): string {
+  if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('pt-BR', {
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('pt-BR');
+}
+
+export function formatarDataHora(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
-}
-
-/** "há 12s", "há 3min" — tempo relativo curto para o feed */
-export function tempoRelativo(iso: string, agora = Date.now()): string {
-  const d = new Date(iso).getTime();
-  if (Number.isNaN(d)) return '—';
-  const seg = Math.max(0, Math.round((agora - d) / 1000));
-  if (seg < 60) return `há ${seg}s`;
-  const min = Math.round(seg / 60);
-  if (min < 60) return `há ${min}min`;
-  const h = Math.round(min / 60);
-  return `há ${h}h`;
 }

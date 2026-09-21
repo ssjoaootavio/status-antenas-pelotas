@@ -1,26 +1,32 @@
-export type StatusAntena = 'online' | 'instavel' | 'offline';
-
-export type Operadora = 'Vivo' | 'Claro' | 'TIM' | 'Oi';
-
 export interface Antena {
   id: string;
-  nome: string;
-  bairro: string;
-  operadora: Operadora;
-  status: StatusAntena;
-  tecnologia: string; // ex.: "4G", "5G", "4G/5G"
+  operadora: string;
+  /** nomes técnicos: GSM, WCDMA, UMTS, LTE, NR */
+  tecnologias: string[];
+  bandas: string[];
   lat: number;
-  lng: number;
-  /** ISO 8601 — momento da última leitura de status */
-  atualizadoEm: string;
+  lon: number;
+  logradouro: string;
+  infraestrutura: string;
+  /** data de licenciamento (ISO ou YYYY-MM-DD) */
+  licenciamento: string;
 }
 
-export interface Resumo {
-  total: number;
-  online: number;
-  instavel: number;
-  offline: number;
-  /** % de antenas no ar (online) */
-  percentualNoAr: number;
-  bairrosAfetados: number;
+export interface PorOperadora {
+  operadora: string;
+  erbs: number;
+  tecnologias: Record<string, number>;
+}
+
+export interface DadosPelotas {
+  municipio: { codigo_ibge: number; nome: string; uf: string };
+  /** quando a base da Anatel foi gerada */
+  baseAtualizadaEm: string;
+  totais: { estacoes: number; erbs_celular: number; outras_estacoes: number };
+  porTecnologia: Record<string, number>;
+  porOperadora: PorOperadora[];
+  fonte: string;
+  /** quando este snapshot foi coletado */
+  geradoEm: string;
+  erbs: Antena[];
 }

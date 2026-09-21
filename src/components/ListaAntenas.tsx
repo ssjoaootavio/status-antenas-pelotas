@@ -1,5 +1,5 @@
 import type { Antena } from '../types';
-import { CORES_STATUS, LABEL_STATUS, tempoRelativo } from '../utils';
+import { corDaOperadora, geracoesDe } from '../utils';
 
 interface Props {
   antenas: Antena[];
@@ -22,27 +22,24 @@ export function ListaAntenas({ antenas, selecionada, onSelecionar }: Props) {
         >
           <span
             className="ponto-status"
-            style={{ backgroundColor: CORES_STATUS[a.status] }}
-            title={LABEL_STATUS[a.status]}
+            style={{ backgroundColor: corDaOperadora(a.operadora) }}
+            title={a.operadora}
           />
           <div className="lista-info">
             <div className="lista-linha1">
-              <strong>{a.bairro}</strong>
-              <span className="lista-operadora">{a.operadora}</span>
-            </div>
-            <div className="lista-linha2">
-              <span>
-                {a.id} · {a.tecnologia}
-              </span>
-              <span
-                className="lista-badge"
-                style={{ color: CORES_STATUS[a.status] }}
-              >
-                {LABEL_STATUS[a.status]}
+              <strong>{a.operadora}</strong>
+              <span className="lista-geracoes">
+                {geracoesDe(a.tecnologias).map((g) => (
+                  <span className="badge-geracao" key={g}>
+                    {g}
+                  </span>
+                ))}
               </span>
             </div>
+            <div className="lista-linha2">{a.logradouro || 'Endereço não informado'}</div>
             <div className="lista-linha3">
-              atualizado {tempoRelativo(a.atualizadoEm)}
+              ID {a.id}
+              {a.infraestrutura ? ` · ${a.infraestrutura}` : ''}
             </div>
           </div>
         </li>

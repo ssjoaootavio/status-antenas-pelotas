@@ -4,14 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Atualiza o snapshot da Anatel uma vez por dia (09:30 UTC ~ 06:30 BRT).
+  schedule:
+    - cron: '30 9 * * *'
 
-# Permissões necessárias para publicar no Pages.
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Um deploy por vez; cancela execuções antigas em andamento.
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -31,6 +32,15 @@ jobs:
 
       - name: Instalar dependências
         run: npm ci
+
+      # Busca os dados reais no build. O token vem do secret do repositório,
+      # nunca é embarcado no site. Se falhar (ex.: cota), mantém o snapshot
+      # já versionado para o build não quebrar.
+      - name: Atualizar snapshot da Anatel
+        continue-on-error: true
+        env:
+          RMF_TOKEN: ${{ secrets.RMF_TOKEN }}
+        run: npm run fetch
 
       - name: Build
         run: npm run build

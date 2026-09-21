@@ -1,59 +1,70 @@
-# Status das Antenas · Pelotas
+# Antenas de Celular · Pelotas
 
-Painel web para acompanhar o status das antenas de celular (ERBs) em Pelotas
-durante uma contingência (ex.: queda de sinal após temporal). Mostra um **mapa**,
-um **resumo** (% no ar, instáveis, fora do ar, bairros afetados) e uma **lista
-filtrável** por bairro, operadora e status, com **auto-refresh**.
+Painel web com o **mapa das antenas de celular (ERBs) de Pelotas**, a partir do
+cadastro da **Anatel (Mosaico)** servido pela API do
+[Redes Móveis Fixas (RMF)](https://redesmoveisfixas.com/createapi). Mostra mapa,
+resumo por operadora/tecnologia e lista filtrável.
+
+> **O que este painel é (e o que não é).** Ele mostra **onde as antenas estão
+> licenciadas** e quais tecnologias (2G/3G/4G/5G) cada uma tem. **Não** é medição
+> de sinal em tempo real e **não** indica quais antenas estão fora do ar — esse
+> dado não existe publicamente. A camada de cobertura da Anatel é modelada, não
+> medida.
 
 ## Stack
 
 - **Vite + React + TypeScript**
-- **Leaflet** + OpenStreetMap (mapa, sem chave de API)
+- **Leaflet** + OpenStreetMap (mapa, sem chave)
 
-## Como rodar
+## Como os dados chegam (e por que o token fica seguro)
+
+O token da API do RMF é **secreto** e não pode ir para um site estático público.
+Como o cadastro da Anatel **não é tempo real** (atualiza ~1x/dia), os dados são
+buscados no **build**, não no navegador:
+
+1. `scripts/fetch-dados.mjs` roda no build, usa o token e varre Pelotas.
+2. Grava um snapshot público em `public/dados-pelotas.json`.
+3. O site (estático) apenas lê esse JSON. **O token nunca chega ao navegador.**
+
+No GitHub Actions, o token entra como o **secret `RMF_TOKEN`** do repositório, e
+um agendamento diário mantém o snapshot atualizado.
+
+## Rodar localmente
 
 ```bash
 npm install
+
+# 1) gere o snapshot (precisa do token no .env — veja .env.example)
+npm run fetch
+
+# 2) suba o painel
 npm run dev
 ```
 
-Abre em `http://localhost:5173`. Por padrão usa **dados simulados (mock)**.
+O `.env` (com o token) está no `.gitignore` e nunca é versionado.
 
-## Dados: mock vs. API real
+## Deploy
 
-A configuração fica em `.env` (copie de `.env.example`):
+Push na `main` dispara o workflow (`.github/workflows/deploy.yml`), que busca os
+dados, faz o build e publica no GitHub Pages.
 
-| Variável             | Descrição                                                        |
-| -------------------- | ---------------------------------------------------------------- |
-| `VITE_USE_MOCK`      | `true` usa mock; `false` consome a API real                      |
-| `VITE_API_URL`       | endpoint que **lista** as antenas (retorna o JSON com status)    |
-| `VITE_API_TOKEN`     | token de acesso                                                  |
-| `VITE_API_AUTH_MODE` | `bearer`, `x-api-key` ou `query` (como o token é enviado)        |
+Configurar o secret uma vez:
 
-Para ligar a API real: preencha `VITE_API_URL`, defina `VITE_USE_MOCK=false` e,
-se necessário, ajuste o mapeamento de campos em
-[`src/api/antenas.ts`](src/api/antenas.ts) (função `normalizarAntena`).
-
-## ⚠️ Segurança do token
-
-Qualquer variável `VITE_*` é **embutida no JavaScript do navegador** no build —
-ou seja, fica **visível para qualquer usuário**. Se o token for secreto, ele
-**não** deve ir para o frontend em produção. Nesse caso, use um **proxy/backend**
-(uma pequena função serverless ou o `server.proxy` do Vite) que guarda o token no
-servidor e repassa a chamada. Para desenvolvimento local, o `.env` já resolve.
-
-O arquivo `.env` está no `.gitignore` e nunca deve ser versionado.
+```bash
+gh secret set RMF_TOKEN --repo ssjoaootavio/status-antenas-pelotas
+```
 
 ## Estrutura
 
 ```
+scripts/fetch-dados.mjs   # coleta o snapshot da Anatel/RMF (roda no build)
+public/dados-pelotas.json # snapshot público consumido pelo site
 src/
-  api/
-    antenas.ts   # camada de acesso (mock/real) + normalização
-    mock.ts      # gerador de dados simulados de Pelotas
-  components/    # Mapa, Resumo, Lista, Filtros
-  hooks/
-    useAntenas.ts # busca + auto-refresh
+  api/dados.ts            # carrega o snapshot
+  components/             # Mapa, Resumo, Lista, Filtros
+  hooks/useDados.ts
   types.ts
   utils.ts
 ```
+
+Fonte dos dados: Anatel (Mosaico) via Redes Móveis Fixas.

@@ -1,112 +1,91 @@
 import { useMemo, useState } from 'react';
-import { usandoMock } from './api/antenas';
-import { useAntenas } from './hooks/useAntenas';
-import { ResumoStatus } from './components/ResumoStatus';
+import { useDados } from './hooks/useDados';
+import { ResumoAntenas } from './components/ResumoAntenas';
 import { Filtros, type EstadoFiltros } from './components/Filtros';
 import { ListaAntenas } from './components/ListaAntenas';
 import { MapaAntenas } from './components/MapaAntenas';
-import { calcularResumo, formatarHora } from './utils';
-import type { Operadora } from './types';
+import { formatarData, formatarDataHora, geracoesDe } from './utils';
 
-const FILTROS_INICIAIS: EstadoFiltros = {
-  bairro: '',
-  operadora: '',
-  status: '',
-  busca: '',
-};
+const FILTROS_INICIAIS: EstadoFiltros = { operadora: '', geracao: '', busca: '' };
 
 export default function App() {
-  const { antenas, carregando, erro, ultimaAtualizacao, recarregar } =
-    useAntenas(15000);
+  const { dados, carregando, erro } = useDados();
   const [filtros, setFiltros] = useState<EstadoFiltros>(FILTROS_INICIAIS);
   const [selecionada, setSelecionada] = useState<string | null>(null);
 
-  const bairros = useMemo(
-    () => [...new Set(antenas.map((a) => a.bairro))].sort(),
-    [antenas],
-  );
+  const antenas = dados?.erbs ?? [];
+
   const operadoras = useMemo(
-    () => [...new Set(antenas.map((a) => a.operadora))].sort() as Operadora[],
+    () => [...new Set(antenas.map((a) => a.operadora))].sort(),
     [antenas],
   );
 
   const filtradas = useMemo(() => {
     const busca = filtros.busca.trim().toLowerCase();
     return antenas.filter((a) => {
-      if (filtros.bairro && a.bairro !== filtros.bairro) return false;
       if (filtros.operadora && a.operadora !== filtros.operadora) return false;
-      if (filtros.status && a.status !== filtros.status) return false;
+      if (filtros.geracao && !geracoesDe(a.tecnologias).includes(filtros.geracao))
+        return false;
       if (busca) {
-        const alvo = `${a.bairro} ${a.id} ${a.operadora} ${a.nome}`.toLowerCase();
+        const alvo = `${a.operadora} ${a.id} ${a.logradouro}`.toLowerCase();
         if (!alvo.includes(busca)) return false;
       }
       return true;
     });
   }, [antenas, filtros]);
 
-  const resumo = useMemo(() => calcularResumo(filtradas), [filtradas]);
-
   return (
     <div className="app">
       <header className="topo">
         <div className="topo-titulo">
-          <h1>📡 Status das Antenas · Pelotas</h1>
-          <p>Monitoramento de sinal de celular durante a contingência</p>
+          <h1>📡 Antenas de Celular · Pelotas</h1>
+          <p>Mapa das estações (ERBs) licenciadas na Anatel · dados via Redes Móveis Fixas</p>
         </div>
-        <div className="topo-meta">
-          {usandoMock() && <span className="tag-mock">dados simulados</span>}
-          <button className="btn-atualizar" onClick={recarregar} disabled={carregando}>
-            {carregando ? 'Atualizando…' : '↻ Atualizar'}
-          </button>
-          {ultimaAtualizacao && (
+        {dados && (
+          <div className="topo-meta">
             <span className="atualizado-em">
-              última leitura {formatarHora(ultimaAtualizacao.toISOString())}
+              Base Anatel de {formatarData(dados.baseAtualizadaEm)}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </header>
 
-      {erro && (
-        <div className="erro">
-          Erro ao consultar a API: {erro}. Verifique o endpoint e o token no
-          arquivo <code>.env</code>.
-        </div>
+      {carregando && <div className="aviso">Carregando dados…</div>}
+      {erro && <div className="erro">{erro}</div>}
+
+      {dados && (
+        <>
+          <ResumoAntenas antenas={filtradas} />
+
+          <Filtros filtros={filtros} operadoras={operadoras} onChange={setFiltros} />
+
+          <main className="conteudo">
+            <section className="painel-mapa">
+              <MapaAntenas
+                antenas={filtradas}
+                selecionada={selecionada}
+                onSelecionar={setSelecionada}
+              />
+            </section>
+            <aside className="painel-lista">
+              <div className="lista-cabecalho">
+                {filtradas.length} de {antenas.length} antenas
+              </div>
+              <ListaAntenas
+                antenas={filtradas}
+                selecionada={selecionada}
+                onSelecionar={setSelecionada}
+              />
+            </aside>
+          </main>
+
+          <footer className="rodape">
+            Fonte: {dados.fonte}. Snapshot coletado em {formatarDataHora(dados.geradoEm)}.
+            Mostra onde as antenas <b>estão licenciadas</b> — não é medição de sinal
+            em tempo real nem indica quedas.
+          </footer>
+        </>
       )}
-
-      <ResumoStatus resumo={resumo} />
-
-      <Filtros
-        filtros={filtros}
-        bairros={bairros}
-        operadoras={operadoras}
-        onChange={setFiltros}
-      />
-
-      <main className="conteudo">
-        <section className="painel-mapa">
-          <MapaAntenas
-            antenas={filtradas}
-            selecionada={selecionada}
-            onSelecionar={setSelecionada}
-          />
-        </section>
-        <aside className="painel-lista">
-          <div className="lista-cabecalho">
-            {filtradas.length} antena{filtradas.length !== 1 ? 's' : ''}
-          </div>
-          <ListaAntenas
-            antenas={filtradas}
-            selecionada={selecionada}
-            onSelecionar={setSelecionada}
-          />
-        </aside>
-      </main>
-
-      <footer className="rodape">
-        Dados exibidos para fins de monitoramento. Localizações e status são
-        {usandoMock() ? ' simulados ' : ' fornecidos pela API '}
-        e podem não refletir a situação real da rede.
-      </footer>
     </div>
   );
 }
