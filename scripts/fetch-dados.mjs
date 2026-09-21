@@ -91,6 +91,17 @@ async function main() {
     await sleep(3200); // respeita o teto de 20 req/min da rota /api/estacoes
   }
 
+  // Sanidade: se a coleta veio muito abaixo do cadastro, algo falhou
+  // (rajada, rede). Aborta ANTES de escrever, para não corromper o snapshot
+  // nem gerar novidades falsas. O continue-on-error do CI mantém o anterior.
+  const minimo = Math.floor(resumo.totais.erbs_celular * 0.8);
+  if (mapa.size < minimo) {
+    throw new Error(
+      `Coleta incompleta: ${mapa.size} antenas (< ${minimo}, 80% de ` +
+        `${resumo.totais.erbs_celular}). Abortando para preservar o snapshot.`,
+    );
+  }
+
   const erbs = [...mapa.values()]
     .map((e) => ({
       id: String(e.id),
@@ -117,12 +128,68 @@ async function main() {
     erbs,
   };
 
+  // Detecta novidades comparando com o snapshot anterior (mesma lógica do
+  // webhook monitorar-cidade: "nova" e "upgrade"), sem push nem servidor.
+  const anterior = lerJsonSeExistir('public/dados-pelotas.json');
+  const novos = anterior ? detectarNovidades(anterior.erbs ?? [], erbs) : [];
+  if (!anterior) {
+    console.log('Primeiro snapshot: novidades começam a valer a partir do próximo.');
+  } else {
+    console.log(`Novidades detectadas hoje: ${novos.length}.`);
+  }
+
+  const histAntes = lerJsonSeExistir('public/novidades.json')?.eventos ?? [];
+  const eventos = [...novos, ...histAntes].slice(0, 300); // guarda os últimos 300
+
   mkdirSync('public', { recursive: true });
   writeFileSync('public/dados-pelotas.json', JSON.stringify(saida));
-  console.log(
-    `\nOK: ${erbs.length} antenas gravadas em public/dados-pelotas.json ` +
-      `(cadastro diz ${resumo.totais.erbs_celular}).`,
+  writeFileSync(
+    'public/novidades.json',
+    JSON.stringify({ geradoEm: new Date().toISOString(), eventos }),
   );
+  console.log(
+    `\nOK: ${erbs.length} antenas gravadas (cadastro diz ` +
+      `${resumo.totais.erbs_celular}); ${eventos.length} novidades no histórico.`,
+  );
+}
+
+function lerJsonSeExistir(caminho) {
+  if (!existsSync(caminho)) return null;
+  try {
+    return JSON.parse(readFileSync(caminho, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/** Compara duas listas de antenas e retorna os eventos "nova" e "upgrade". */
+function detectarNovidades(antes, agora) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const mapaAntes = new Map(antes.map((e) => [String(e.id), e]));
+  const eventos = [];
+
+  for (const e of agora) {
+    const previo = mapaAntes.get(String(e.id));
+    const base = {
+      data: hoje,
+      id: e.id,
+      operadora: e.operadora,
+      lat: e.lat,
+      lon: e.lon,
+      logradouro: e.logradouro,
+      tecnologias: e.tecnologias,
+    };
+    if (!previo) {
+      eventos.push({ ...base, tipo: 'nova', tecnologiasNovas: [] });
+    } else {
+      const tecAntes = new Set((previo.tecnologias ?? []).map((t) => t.toUpperCase()));
+      const ganhou = (e.tecnologias ?? []).filter((t) => !tecAntes.has(t.toUpperCase()));
+      if (ganhou.length > 0) {
+        eventos.push({ ...base, tipo: 'upgrade', tecnologiasNovas: ganhou });
+      }
+    }
+  }
+  return eventos;
 }
 
 main().catch((e) => {

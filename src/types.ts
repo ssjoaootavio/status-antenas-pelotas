@@ -18,6 +18,25 @@ export interface PorOperadora {
   tecnologias: Record<string, number>;
 }
 
+export interface Novidade {
+  /** data de detecção, YYYY-MM-DD */
+  data: string;
+  id: string;
+  operadora: string;
+  tipo: 'nova' | 'upgrade';
+  tecnologias: string[];
+  /** tecnologias ganhas (só em upgrade) */
+  tecnologiasNovas: string[];
+  lat?: number;
+  lon?: number;
+  logradouro?: string;
+}
+
+export interface NovidadesArquivo {
+  geradoEm: string;
+  eventos: Novidade[];
+}
+
 export interface DadosPelotas {
   municipio: { codigo_ibge: number; nome: string; uf: string };
   /** quando a base da Anatel foi gerada */

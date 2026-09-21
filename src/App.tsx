@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useDados } from './hooks/useDados';
+import { useNovidades } from './hooks/useNovidades';
 import { ResumoAntenas } from './components/ResumoAntenas';
+import { Novidades } from './components/Novidades';
 import { Filtros, type EstadoFiltros } from './components/Filtros';
 import { ListaAntenas } from './components/ListaAntenas';
 import { MapaAntenas } from './components/MapaAntenas';
@@ -10,6 +12,7 @@ const FILTROS_INICIAIS: EstadoFiltros = { operadora: '', geracao: '', busca: '' 
 
 export default function App() {
   const { dados, carregando, erro } = useDados();
+  const novidades = useNovidades();
   const [filtros, setFiltros] = useState<EstadoFiltros>(FILTROS_INICIAIS);
   const [selecionada, setSelecionada] = useState<string | null>(null);
 
@@ -56,6 +59,8 @@ export default function App() {
       {dados && (
         <>
           <ResumoAntenas antenas={filtradas} />
+
+          <Novidades eventos={novidades} />
 
           <Filtros filtros={filtros} operadoras={operadoras} onChange={setFiltros} />
 

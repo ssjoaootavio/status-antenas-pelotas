@@ -9,7 +9,7 @@ on:
     - cron: '30 9 * * *'
 
 permissions:
-  contents: read
+  contents: write # para versionar o snapshot/novidades atualizados
   pages: write
   id-token: write
 
@@ -37,10 +37,26 @@ jobs:
       # nunca é embarcado no site. Se falhar (ex.: cota), mantém o snapshot
       # já versionado para o build não quebrar.
       - name: Atualizar snapshot da Anatel
+        id: fetch
         continue-on-error: true
         env:
           RMF_TOKEN: ${{ secrets.RMF_TOKEN }}
         run: npm run fetch
+
+      # Versiona o snapshot/novidades para que o diff do próximo dia tenha
+      # o "ontem" como base. [skip ci] evita disparar outro workflow.
+      - name: Persistir dados atualizados
+        if: steps.fetch.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/dados-pelotas.json public/novidades.json
+          if git diff --staged --quiet; then
+            echo "Sem mudanças nos dados."
+          else
+            git commit -m "chore(dados): atualiza snapshot e novidades [skip ci]"
+            git push origin HEAD:main
+          fi
 
       - name: Build
         run: npm run build
