@@ -1,0 +1,20 @@
+# Dependências
+node_modules
+dist
+dist-ssr
+
+# Variáveis de ambiente (NUNCA versionar o token real)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / SO
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+Thumbs.db
